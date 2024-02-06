@@ -1,10 +1,16 @@
 export interface ILogin {
-    email: string;
+    username: string;
     password: string;
 }
 
 export interface IRegistration {
-    name: string;
-    email: string;
+    fullName: string;
+    username: string;
     password: string;
+}
+
+export interface IPayload {
+    userId: number;
+    username: string;
+    fullName: string;
 }
