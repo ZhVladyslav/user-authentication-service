@@ -3,42 +3,59 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ILogin } from '../../interfaces/auth.interface';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
-import { IPayload, IRegistration } from '../../interfaces/auth.interface';
+import { IRegistration } from '../../interfaces/auth.interface';
+import { RedisService } from '../redis/redis.service';
+import { IUser } from '../../interfaces/user.interface';
+import { IPayload } from '../../interfaces/token.interface';
+
+interface IAuthService {
+    login: (dto: ILogin) => Promise<{ jwt: string }>;
+    registration: (dto: IRegistration) => Promise<{ message: string }>;
+    userInfo: (jwt: IPayload) => Promise<IUser>;
+}
 
 @Injectable()
-export class AuthService {
+export class AuthService implements IAuthService {
     constructor(
         private readonly prisma: PrismaService,
         private readonly jwtService: JwtService,
+        private readonly redisService: RedisService,
     ) {}
 
-    public async login(dto: ILogin): Promise<{ jwt: string }> {
-        const userInDb = await this.prisma.user.findUnique({
-            where: {
-                username: dto.username.trim().toLocaleLowerCase(),
-            },
-        });
-        if (!userInDb) throw new BadRequestException('incorrect email or password');
+    public async login(dto: ILogin) {
+        let user: IUser;
 
-        const isMatch = await this.checkPassword(dto.password, userInDb.password);
+        const userInRedis = await this.redisService.get(dto.username);
+
+        if (userInRedis) {
+            user = { username: dto.username, ...JSON.parse(userInRedis) };
+        } else {
+            user = await this.prisma.user.findUnique({
+                where: { username: dto.username.trim().toLocaleLowerCase() },
+            });
+
+            if (!user) throw new BadRequestException('incorrect email or password');
+
+            this.setUserInRedis(user);
+        }
+
+        const isMatch = await this.checkPassword(dto.password, user.password);
         if (!isMatch) throw new BadRequestException('incorrect email or password');
 
-        const tokenPayload: IPayload = {
-            userId: userInDb.id,
-            username: userInDb.username,
-            fullName: userInDb.fullName,
-        };
-
-        const jwt = await this.generateToken(tokenPayload);
+        const jwt = await this.generateToken({
+            userId: user.id,
+            username: user.username,
+        });
 
         return { jwt };
     }
 
     public async registration(dto: IRegistration) {
+        const userInRedis = await this.redisService.get(dto.username);
+        if (userInRedis) throw new BadRequestException('user is exist');
+
         const userInDb = await this.prisma.user.findUnique({
-            where: {
-                username: dto.username.trim().toLocaleLowerCase(),
-            },
+            where: { username: dto.username.trim().toLocaleLowerCase() },
         });
         if (userInDb) throw new BadRequestException('user is exist');
 
@@ -53,21 +70,21 @@ export class AuthService {
         });
         if (!newUser) throw new InternalServerErrorException('error add user');
 
+        this.setUserInRedis(newUser);
+
         return { message: 'add user done' };
     }
 
     public async userInfo(jwt: IPayload) {
+        const userInRedis = await this.redisService.get(jwt.username);
+        if (userInRedis) return { username: jwt.username, ...JSON.parse(userInRedis) };
+
         const userInDb = await this.prisma.user.findUnique({
-            where: {
-                id: jwt.userId,
-            },
-            select: {
-                id: true,
-                username: true,
-                fullName: true,
-            },
+            where: { id: jwt.userId },
         });
         if (!userInDb) throw new NotFoundException('user is not found');
+
+        this.setUserInRedis(userInDb);
 
         return userInDb;
     }
@@ -88,7 +105,7 @@ export class AuthService {
         }
     }
 
-    private async generateToken(payload: IPayload) {
+    private async generateToken(payload: IPayload): Promise<string> {
         try {
             return this.jwtService.signAsync(payload, {
                 secret: process.env['JWT_SECRET'],
@@ -97,5 +114,17 @@ export class AuthService {
         } catch (err) {
             throw new InternalServerErrorException();
         }
+    }
+
+    private async setUserInRedis(user: IUser): Promise<void> {
+        return this.redisService.set(
+            user.username, //
+            JSON.stringify({
+                userId: user.id,
+                fullName: user.fullName,
+                password: user.password,
+            }),
+            60 * 60,
+        );
     }
 }

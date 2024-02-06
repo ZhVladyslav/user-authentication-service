@@ -2,8 +2,8 @@ import { Body, Controller, Get, Post } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegistrationDto } from './dto/registration.dto';
-import { IPayload } from '../../interfaces/auth.interface';
 import { GetTokenPayload, Public } from '../../decorators';
+import { IPayload } from '../../interfaces/token.interface';
 
 @Controller('auth')
 export class AuthController {

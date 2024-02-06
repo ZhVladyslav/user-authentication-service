@@ -8,9 +8,3 @@ export interface IRegistration {
     username: string;
     password: string;
 }
-
-export interface IPayload {
-    userId: number;
-    username: string;
-    fullName: string;
-}
