@@ -4,9 +4,16 @@ import { LoginDto } from './dto/login.dto';
 import { RegistrationDto } from './dto/registration.dto';
 import { GetTokenPayload, Public } from '../../decorators';
 import { IPayload } from '../../interfaces/token.interface';
+import { IUser } from '../../interfaces/user.interface';
+
+interface IAuthController {
+    login: (dto: LoginDto) => Promise<{ jwt: string }>;
+    registration: (dto: RegistrationDto) => Promise<{ message: string }>;
+    userInfo: (jwt: IPayload) => Promise<IUser>;
+}
 
 @Controller('auth')
-export class AuthController {
+export class AuthController implements IAuthController {
     constructor(private readonly authService: AuthService) {}
 
     @Public()

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ILogin } from '../../interfaces/auth.interface';
 import { JwtService } from '@nestjs/jwt';
@@ -16,6 +16,8 @@ interface IAuthService {
 
 @Injectable()
 export class AuthService implements IAuthService {
+    logger: Logger = new Logger(AuthService.name);
+
     constructor(
         private readonly prisma: PrismaService,
         private readonly jwtService: JwtService,
@@ -77,7 +79,10 @@ export class AuthService implements IAuthService {
 
     public async userInfo(jwt: IPayload) {
         const userInRedis = await this.redisService.get(jwt.username);
-        if (userInRedis) return { username: jwt.username, ...JSON.parse(userInRedis) };
+        if (userInRedis) {
+            const userData: IUser = { username: jwt.username, ...JSON.parse(userInRedis) };
+            return userData;
+        }
 
         const userInDb = await this.prisma.user.findUnique({
             where: { id: jwt.userId },
@@ -93,6 +98,7 @@ export class AuthService implements IAuthService {
         try {
             return await bcrypt.hash(password, 12);
         } catch (err) {
+            this.logger.error('generatePasswordHash:', err);
             throw new InternalServerErrorException();
         }
     }
@@ -101,6 +107,7 @@ export class AuthService implements IAuthService {
         try {
             return await bcrypt.compare(passwordInReq, passwordHash);
         } catch (err) {
+            this.logger.error('checkPassword:', err);
             throw new InternalServerErrorException();
         }
     }
@@ -112,19 +119,25 @@ export class AuthService implements IAuthService {
                 expiresIn: 60 * 60 * 24 * 7,
             });
         } catch (err) {
+            this.logger.error('generateToken', err);
             throw new InternalServerErrorException();
         }
     }
 
     private async setUserInRedis(user: IUser): Promise<void> {
-        return this.redisService.set(
-            user.username, //
-            JSON.stringify({
-                userId: user.id,
-                fullName: user.fullName,
-                password: user.password,
-            }),
-            60 * 60,
-        );
+        try {
+            await this.redisService.set(
+                user.username, //
+                JSON.stringify({
+                    userId: user.id,
+                    fullName: user.fullName,
+                    password: user.password,
+                }),
+                60 * 60,
+            );
+        } catch (err) {
+            this.logger.error('setUserInRedis', err);
+            throw new InternalServerErrorException();
+        }
     }
 }
