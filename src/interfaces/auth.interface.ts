@@ -1,10 +1,5 @@
-export interface ILogin {
-    username: string;
-    password: string;
-}
+import { IUser } from './user.interface';
 
-export interface IRegistration {
-    fullName: string;
-    username: string;
-    password: string;
-}
+export interface ILogin extends Pick<IUser, 'username' | 'password'> {}
+
+export interface IRegistration extends Omit<IUser, 'id'> {}

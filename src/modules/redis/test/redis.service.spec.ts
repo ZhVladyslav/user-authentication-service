@@ -1,11 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import Redis from 'ioredis';
 import * as redisMock from 'redis-mock';
 import { RedisService } from '../redis.service';
 
 describe('RedisService', () => {
     let service: RedisService;
-    let redisClientMock: redisMock.RedisClient;
+    let redisClientMock: { set: jest.Mock<any, any, any>; get: jest.Mock<any, any, any> };
 
     beforeEach(async () => {
         redisClientMock = {

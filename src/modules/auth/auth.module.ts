@@ -7,11 +7,7 @@ import { JwtStrategy } from '../../passport';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
-    imports: [
-        JwtModule.register({}),
-        PrismaModule,
-        RedisModule
-    ],
+    imports: [JwtModule.register({}), PrismaModule, RedisModule],
     controllers: [AuthController],
     providers: [AuthService, JwtStrategy],
 })

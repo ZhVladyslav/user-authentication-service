@@ -36,13 +36,13 @@ export class AuthService implements IAuthService {
                 where: { username: dto.username.trim().toLocaleLowerCase() },
             });
 
-            if (!user) throw new BadRequestException('incorrect email or password');
+            if (!user) throw new BadRequestException('incorrect username or password');
 
             this.setUserInRedis(user);
         }
 
         const isMatch = await this.checkPassword(dto.password, user.password);
-        if (!isMatch) throw new BadRequestException('incorrect email or password');
+        if (!isMatch) throw new BadRequestException('incorrect username or password');
 
         const jwt = await this.generateToken({
             userId: user.id,
@@ -85,7 +85,7 @@ export class AuthService implements IAuthService {
         }
 
         const userInDb = await this.prisma.user.findUnique({
-            where: { id: jwt.userId },
+            where: { username: jwt.username },
         });
         if (!userInDb) throw new NotFoundException('user is not found');
 
